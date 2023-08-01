@@ -1,6 +1,10 @@
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Scanner;
 
 /**
  * B+Tree Structure Key - StudentId Leaf Node should contain [ key,recordId ]
@@ -22,9 +26,9 @@ class BTree {
   }
 
   long searchHelper(long studentId, BTreeNode currNode) {
-    
+
     // helper method to search through nodes recursively
-    
+
     if (currNode.leaf) {
       // leaf node found, value should be in this node
       for (int i = 0; i < currNode.n; i++) {
@@ -43,7 +47,8 @@ class BTree {
         }
       }
       if (index == -1) {
-        index = currNode.children.length - 1; // assign children index to max val as currid > greatest id at currNode
+        index = currNode.children.length - 1; // assign children index to max val as currid >
+                                              // greatest id at currNode
       }
       return searchHelper(studentId, currNode.children[index]); // recursively search child
     }
@@ -51,16 +56,16 @@ class BTree {
 
   long search(long studentId) {
     /**
-     * TODO: Implement this function to search in the B+Tree. Return recordID for the given
+     * Implement this function to search in the B+Tree. Return recordID for the given
      * StudentID. Otherwise, print out a message that the given studentId has not been found in the
      * table and return -1.
      */
 
     if (root == null) {
-      return -1;
+      return -1; // tree empty, can't search
     }
-    
-    return searchHelper(studentId, root);
+
+    return searchHelper(studentId, root); // search for student
 
   }
 
@@ -128,7 +133,7 @@ class BTree {
 
   BTree insert(Student student) {
     /**
-     * TODO: Implement this function to insert in the B+Tree. Also, insert in student.csv after
+     * Implement this function to insert in the B+Tree. Also, insert in student.csv after
      * inserting in B+Tree.
      */
 
@@ -164,7 +169,7 @@ class BTree {
           }
         }
       } else {
-        
+
         // case 2: overflow in leaf node, need to split
         int index = -1;
         for (int i = 0; i < location.n; i++) {
@@ -177,11 +182,11 @@ class BTree {
         if (index == -1) {
           index = 2 * t; // assign index to max val as currid > greatest id at node
         }
-        
+
         BTreeNode left = new BTreeNode(t, true);
         BTreeNode right = new BTreeNode(t, true);
-        
-        
+
+
         if (index < t) {
           // new student goes to left leaf node
           for (int i = 0; i < t - 1; i++) {
@@ -189,16 +194,16 @@ class BTree {
             left.values[i] = location.values[i];
             left.n++;
           }
-          left.keys[t-1] = student.studentId;
-          left.values[t-1] = student.recordId;
+          left.keys[t - 1] = student.studentId;
+          left.values[t - 1] = student.recordId;
           left.n++;
           left.next = right;
           sortArray(left);
-          
+
           for (int i = t - 1; i < location.n; i++) {
-            // figure this out
+            // TODO split values into right node
           }
-          // set parents and check overflow
+          // TODO set parents and check overflow
         } else {
           // goes to right leaf node
           for (int i = 0; i < t; i++) {
@@ -208,19 +213,52 @@ class BTree {
           }
           left.next = right;
           for (int i = t; i < location.n; i++) {
-            // figure this out
+            // TODO split values into right leaf node
           }
           right.keys[t] = student.studentId;
           right.values[t] = student.recordId;
           right.n++;
           sortArray(right);
-          // set parents and check overflow
+          // TODO set parents and check overflow
         }
       }
 
+      // add to csv
 
+      // gather all students in csv
+      List<Long> students = new ArrayList<>();
+      Scanner csv = null;
 
-      // subcase 2: overflow in leaf node recursively causes overflow in non-leaf node
+      try {
+        csv = new Scanner(new File("src/Student.csv"));
+      } catch (IOException e) {
+        System.out.println("File not found.");
+      }
+
+      while (csv.hasNextLine()) {
+        String[] studentLine = csv.nextLine().split(",");
+        students.add(Long.parseLong(studentLine[0]));
+      }
+      csv.close();
+
+      // add to file if no duplicates
+      FileWriter studentFile = null;
+      try {
+        studentFile = new FileWriter("src/Student.csv", true);
+      } catch (IOException e) {
+        System.out.println("File not found.");
+      }
+
+      if (!students.contains(student.studentId)) {
+        String newStudent = student.studentId + "," + student.studentName + "," + student.major
+            + "," + student.level + "," + student.age + "," + student.recordId + "\n";
+        try {
+          studentFile.write(newStudent);
+          studentFile.close();
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }
 
     }
     return this;
@@ -232,8 +270,129 @@ class BTree {
      * deleting in B+Tree, if it exists. Return true if the student is deleted successfully
      * otherwise, return false.
      */
+
+    boolean toReturn = false;
+
+    // Root doesn't exist
+    if (root == null) {
+      return false;
+    }
+
+    if (root.leaf) {
+      toReturn = delFromLeaf(root, studentId);
+    } else {
+      toReturn = findChild(root, studentId);
+    }
+
+    // TODO
+    if (toReturn) {
+      // delete from CSV
+    }
+
+    return toReturn;
+  }
+
+  private boolean delFromLeaf(BTreeNode node, long key) {
+    
+    // helper function to delete from leaf node
+    int index = -1;
+
+    for (int i = 0; i < node.keys.length; i++) {
+      if (node.keys[i] == key) {
+        index = i;
+        break;
+      }
+    }
+
+    if (index == -1) {
+      return false; // key not found
+    }
+
+    // Key found - remove it from the array
+    for (int k = index; k < node.keys.length; k++) {
+      if (k == node.keys.length - 1) {
+        node.keys[k] = 0; // sets last index to 0, effectively removing the key
+        node.values[k] = 0;
+      } else {
+        node.keys[k] = node.keys[k + 1];
+        node.values[k] = node.values[k+1]; // moves everything up one index
+      }
+    }
+
+    // Update key count
+    node.n--;
+
     return true;
   }
+
+  private boolean findChild(BTreeNode current, long key) {
+
+    int childIndex = -1;
+    boolean toReturn = false;
+
+    // Find the right child to visit
+    for (int i = 0; i < current.keys.length; i++) {
+      if ((key < current.keys[i]) || (current.keys[i] == 0)) {
+        childIndex = i;
+        break; // child index found
+      }
+    }
+    
+    if (childIndex == -1) {
+      childIndex = current.children.length - 1; // max val of child as key > max key in current
+    }
+
+    
+    BTreeNode child = current.children[childIndex];
+
+    if (child != null && child.leaf) { // Child is a leaf
+      toReturn = delFromLeaf(child, key); // delete from leaf
+
+      if (!toReturn) {
+        return toReturn; // key not found and deleted from helper method
+      }
+
+      // case 1: child doesn't have enough keys
+      
+      if (child.n < t) { 
+
+        // Try to redistribute from sibling
+        if (child.next != null && child.next.n > t) { // Next leaf has available keys
+
+          // Move first key/value in next to child
+          child.keys[child.n] = child.next.keys[0];
+          child.values[child.n] = child.next.values[0];
+
+          // Remove key from next's keys array
+          for (int i = 0; i < child.next.keys.length - 1; i++) {
+            child.next.keys[i] = child.next.keys[i + 1];
+            child.next.values[i] = child.next.values[i + 1];
+          }
+          // remove last index
+          child.next.keys[child.next.keys.length - 1] = 0;
+          child.next.values[child.next.values.length - 1] = 0;
+
+          // Replace key in parent with new 1st key in next
+          current.keys[childIndex - 1] = child.next.keys[0];
+
+          // Update the key counts
+          child.n++;
+          child.next.n--;
+
+        } else {
+          // TODO case 2: merge siblings
+        }
+      }
+    } else { // Child is not a leaf
+      toReturn = findChild(child, key);
+
+      if (!toReturn) {
+        return toReturn;
+      }
+    }
+    return toReturn;
+  }
+
 
   List<Long> print() {
 
